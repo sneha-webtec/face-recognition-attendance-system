@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS attendance (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
     event TEXT,
+    date TEXT,
     time TEXT
 )
 """)

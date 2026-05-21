@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Smart Attendance Dashboard</title>
+
+    <!-- GOOGLE FONT -->
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet"
+    >
+
+    <!-- FONT AWESOME -->
+
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    >
+
+    <!-- CSS -->
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+<body>
+
+    <!-- HEADER -->
+
+    <header class="header">
+
+        <div class="logo">
+
+            <i class="fa-solid fa-camera"></i>
+
+            Smart Attendance
+
+        </div>
+
+    </header>
+
+    <!-- ACTION BUTTONS -->
+
+    <div class="actions">
+
+        <a href="/register">
+
+            <button class="action-btn">
+
+                Register Employee
+
+            </button>
+
+        </a>
+
+        <a href="/train">
+
+            <button class="action-btn">
+
+                Train Model
+
+            </button>
+
+        </a>
+
+        <a href="/attendance">
+
+            <button class="action-btn">
+
+                Start Attendance
+
+            </button>
+
+        </a>
+
+    </div>
+
+    <!-- SUMMARY CARDS -->
+
+    <section class="cards">
+
+        <div class="card blue">
+
+            <i class="fa-solid fa-users"></i>
+
+            <h2>{{ total_users }}</h2>
+
+            <p>Total Employees</p>
+
+        </div>
+
+        <div class="card green">
+
+            <i class="fa-solid fa-user-check"></i>
+
+            <h2>{{ inside_count }}</h2>
+
+            <p>Inside</p>
+
+        </div>
+
+        <div class="card orange">
+
+            <i class="fa-solid fa-user-clock"></i>
+
+            <h2>{{ outside_count }}</h2>
+
+            <p>Outside</p>
+
+        </div>
+
+        <div class="card red">
+
+            <i class="fa-solid fa-triangle-exclamation"></i>
+
+            <h2>{{ unknown_attempts }}</h2>
+
+            <p>Unknown Attempts</p>
+
+        </div>
+
+    </section>
+
+    <!-- TABLE SECTION -->
+
+    <section class="table-section">
+
+        <div class="table-header">
+
+            <h2>Employee Attendance</h2>
+
+            <input
+                type="text"
+                placeholder="Search Employee..."
+                class="search-box"
+                id="searchInput"
+                onkeyup="searchEmployee()"
+            >
+
+        </div>
+
+        <!-- TABLE -->
+
+        <table>
+
+            <thead>
+
+                <tr>
+
+                    <th>Name</th>
+
+                    <th>Entry</th>
+
+                    <th>Exit</th>
+
+                    <th>Status</th>
+
+                    <th>Logs</th>
+
+                    <th>Working Hours</th>
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for employee in employee_data %}
+
+                <tr>
+
+                    <!-- NAME -->
+
+                    <td>
+
+                        <div class="employee-name">
+
+                            <div class="avatar">
+
+                                {{ employee.name[0]|upper }}
+
+                            </div>
+
+                            {{ employee.name }}
+
+                        </div>
+
+                    </td>
+
+                    <!-- ENTRY -->
+
+                    <td>
+
+                        {{ employee.entry }}
+
+                    </td>
+
+                    <!-- EXIT -->
+
+                    <td>
+
+                        {{ employee.exit }}
+
+                    </td>
+
+                    <!-- STATUS -->
+
+                    <td>
+
+                        {% if employee.status == "Inside" %}
+
+                        <span class="status inside">
+
+                            Inside
+
+                        </span>
+
+                        {% else %}
+
+                        <span class="status outside">
+
+                            Outside
+
+                        </span>
+
+                        {% endif %}
+
+                    </td>
+
+                    <!-- VIEW LOGS -->
+
+                    <td>
+
+                        <button
+                            class="log-btn"
+                            onclick="showLogs('{{ employee.name }}')"
+                        >
+
+                            View Logs
+
+                        </button>
+
+                    </td>
+
+                    <!-- WORKING HOURS -->
+
+                    <td>
+
+                        {{ employee.working_hours }}
+
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </section>
+
+    <!-- LOG MODAL -->
+
+    <div
+        class="modal"
+        id="logModal"
+    >
+
+        <div class="modal-content">
+
+            <span
+                class="close-btn"
+                onclick="closeModal()"
+            >
+
+                &times;
+
+            </span>
+
+            <h2 id="modalTitle">
+
+                Attendance Logs
+
+            </h2>
+
+            <div id="modalLogs">
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- SEARCH SCRIPT -->
+
+    <script>
+
+        function searchEmployee() {
+
+            let input =
+                document
+                    .getElementById("searchInput")
+                    .value
+                    .toLowerCase();
+
+            let rows =
+                document.querySelectorAll("tbody tr");
+
+            rows.forEach(row => {
+
+                let name =
+                    row
+                        .querySelector(".employee-name")
+                        .innerText
+                        .toLowerCase();
+
+                if (name.includes(input)) {
+
+                    row.style.display = "";
+
+                }
+
+                else {
+
+                    row.style.display = "none";
+
+                }
+
+            });
+
+        }
+
+    </script>
+
+    <!-- LOG SCRIPT -->
+
+    <script>
+
+        const employeeLogs = {
+
+            {% for employee in employee_data %}
+
+            "{{ employee.name }}": [
+
+                {% for log in employee.logs %}
+
+                {
+
+                    event: "{{ log.event }}",
+
+                    time: "{{ log.time }}"
+
+                },
+
+                {% endfor %}
+
+            ],
+
+            {% endfor %}
+
+        };
+
+        function showLogs(name) {
+
+            let modal =
+                document.getElementById("logModal");
+
+            let modalLogs =
+                document.getElementById("modalLogs");
+
+            let modalTitle =
+                document.getElementById("modalTitle");
+
+            modalTitle.innerHTML =
+                name + " Logs";
+
+            modalLogs.innerHTML = "";
+
+            let logs = employeeLogs[name];
+
+            if (logs.length === 0) {
+
+                modalLogs.innerHTML =
+                    "<p>No logs found</p>";
+
+            }
+
+            else {
+
+                logs.forEach(log => {
+
+                    modalLogs.innerHTML += `
+
+                        <div class="log-item">
+
+                            <span>${log.event}</span>
+
+                            <span>${log.time}</span>
+
+                        </div>
+
+                    `;
+
+                });
+
+            }
+
+            modal.style.display = "flex";
+
+        }
+
+        function closeModal() {
+
+            document.getElementById("logModal")
+                .style.display = "none";
+
+        }
+
+        // CLOSE MODAL WHEN CLICKING OUTSIDE
+
+        window.onclick = function(event) {
+
+            let modal =
+                document.getElementById("logModal");
+
+            if (event.target == modal) {
+
+                modal.style.display = "none";
+
+            }
+
+        }
+
+    </script>
+
+</body>
+
+</html>

@@ -4,11 +4,12 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import cv2
 import numpy as np
 from deepface import DeepFace
-import sqlite3
+import psycopg2
 from datetime import datetime
 import json
 import time
 import winsound
+from attendance_policy import check_attendance_policy
 
 # ----------------------------
 # CONFIG
@@ -32,24 +33,41 @@ with open(LABELS_PATH, "r") as f:
 # DB FUNCTIONS
 # ----------------------------
 def get_user_expression(name):
-    conn = sqlite3.connect("attendance.db")
+    conn = psycopg2.connect(
+    host="localhost",
+    database="attendance_system",
+    user="postgres",
+    password="admin123",
+    port="5432"
+)
+
     cursor = conn.cursor()
-    cursor.execute("SELECT expression FROM users WHERE name=?", (name,))
-    row = cursor.fetchone()
+    cursor.execute("SELECT expression FROM employees WHERE employee_name=%s", (name,))
+    result = cursor.fetchone()
     conn.close()
-    return row[0] if row else None
+    if result:
+        return result[0]
+    return None
 
 
 def log_event(name, event):
-    conn = sqlite3.connect("attendance.db")
+    conn = psycopg2.connect(
+    host="localhost",
+    database="attendance_system",
+    user="postgres",
+    password="admin123",
+    port="5432"
+)
+
     cursor = conn.cursor()
 
     time_now = datetime.now().strftime("%H:%M:%S")
+    date_now = datetime.now().strftime("%Y-%m-%d")
 
     cursor.execute("""
-    INSERT INTO attendance (name, event, time)
-    VALUES (?, ?, ?)
-    """, (name, event, time_now))
+    INSERT INTO attendance (name, event, date, time)
+    VALUES (%s, %s, %s, %s)
+    """, (name, event, date_now, time_now))
 
     conn.commit()
     conn.close()
@@ -57,12 +75,19 @@ def log_event(name, event):
     print(f"✅ {name} {event}")
 
 def get_last_status(name):
-    conn = sqlite3.connect("attendance.db")
+    conn = psycopg2.connect(
+    host="localhost",
+    database="attendance_system",
+    user="postgres",
+    password="admin123",
+    port="5432"
+)
+
     cursor = conn.cursor()
 
     cursor.execute("""
     SELECT event FROM attendance
-    WHERE name=?
+    WHERE name=%s
     ORDER BY id DESC LIMIT 1
     """, (name,))
 
@@ -85,6 +110,26 @@ def play_alert():
 # CAMERA
 # ----------------------------
 cap = cv2.VideoCapture(0)
+# ----------------------------
+# CHECK CAMERA ACCESS
+# ----------------------------
+
+if not cap.isOpened():
+
+    import tkinter as tk
+    from tkinter import messagebox
+
+    root = tk.Tk()
+    root.withdraw()
+
+    messagebox.showerror(
+        "Camera Error",
+        "Camera access not available.\nPlease allow camera permission or connect a webcam."
+    )
+
+    print("❌ Camera not accessible")
+
+    exit()
 
 print("📸 Camera started")
 start_time = time.time()
@@ -110,7 +155,7 @@ while True:
 
         id_, confidence = recognizer.predict(face_gray)
 
-        if confidence > 65:
+        if confidence > 60:
 
                 display_text = "UNKNOWN PERSON"
                 color = (0,0,255)
@@ -199,7 +244,7 @@ while True:
 
     cv2.imshow("System", frame)
     
-    if success or (time.time() - start_time > 7):
+    if success or (time.time() - start_time > 5):
        if unknown_detected:
            play_alert()
        cv2.waitKey(2000)

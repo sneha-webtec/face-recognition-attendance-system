@@ -1,66 +1,110 @@
 import cv2
-import os
-import json
 import numpy as np
-DATASET_PATH = "dataset"
+import psycopg2
+import base64
+import json
 
-recognizer = cv2.face.LBPHFaceRecognizer_create()
-face_cascade = cv2.CascadeClassifier(
-    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+print("🚀 Training started...")
+
+# ----------------------------
+# POSTGRESQL CONNECTION
+# ----------------------------
+
+conn = psycopg2.connect(
+    host="localhost",
+    database="attendance_system",
+    user="postgres",
+    password="admin123",
+    port="5432"
 )
+
+cursor = conn.cursor()
+
+# ----------------------------
+# GET ALL EMPLOYEE FACES
+# ----------------------------
+
+cursor.execute("""
+SELECT e.employee_name,
+       f.face_base64
+FROM employee_faces f
+JOIN employees e
+ON f.employee_id = e.employee_id
+""")
+
+rows = cursor.fetchall()
+
+conn.close()
+
+# ----------------------------
+# PREPARE TRAINING DATA
+# ----------------------------
 
 faces = []
 labels = []
 
-label_map = {}
+label_ids = {}
 current_id = 0
 
-print("🚀 Training started...")
+for employee_name, face_base64 in rows:
 
-for person_name in os.listdir(DATASET_PATH):
+    # Create label ID
+    if employee_name not in label_ids:
 
-    person_path = os.path.join(DATASET_PATH, person_name)
+        label_ids[employee_name] = current_id
 
-    if not os.path.isdir(person_path):
-        continue
-
-    print(f"📁 Processing: {person_name}")
-
-    # 🔥 FIX: Assign ID if not already present
-    if person_name not in label_map:
-        label_map[person_name] = current_id
         current_id += 1
 
-    for image_name in os.listdir(person_path):
+    label = label_ids[employee_name]
 
-        image_path = os.path.join(person_path, image_name)
+    # Decode Base64
+    image_data = base64.b64decode(face_base64)
 
-        img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    np_array = np.frombuffer(image_data, np.uint8)
 
-        if img is None:
-            continue
+    img = cv2.imdecode(np_array, cv2.IMREAD_GRAYSCALE)
 
-        detected = face_cascade.detectMultiScale(img, 1.3, 5)
+    if img is None:
+        continue
 
-        for (x, y, w, h) in detected:
-            face = img[y:y+h, x:x+w]
+    faces.append(img)
 
-            faces.append(face)
-            labels.append(label_map[person_name])
+    labels.append(label)
+
+# ----------------------------
+# CHECK EMPTY DATA
+# ----------------------------
+
+if len(faces) == 0:
+
+    print("❌ No training images found")
+
+    exit()
 
 # ----------------------------
 # TRAIN MODEL
 # ----------------------------
-recognizer.train(faces, np.array(labels))
 
-# SAVE MODEL
+recognizer = cv2.face.LBPHFaceRecognizer_create()
+
+recognizer.train(
+    faces,
+    np.array(labels)
+)
+
 recognizer.save("model.yml")
 
-# SAVE LABELS (IMPORTANT FORMAT)
-labels_output = {str(v): k for k, v in label_map.items()}
+
+# ----------------------------
+# SAVE LABELS
+# ----------------------------
 
 with open("labels.json", "w") as f:
-    json.dump(labels_output, f)
 
-print("✅ Training completed!")
-print("Label Map:", labels_output)
+    json.dump(
+        {v: k for k, v in label_ids.items()},
+        f
+    )
+
+print("✅ Model trained successfully")
+print(f"✅ Total faces trained: {len(faces)}")

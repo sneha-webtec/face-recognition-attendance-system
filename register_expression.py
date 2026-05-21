@@ -1,6 +1,6 @@
 import cv2
 from deepface import DeepFace
-import sqlite3
+import psycopg2
 import time
 
 cap = cv2.VideoCapture(0)
@@ -89,13 +89,21 @@ cv2.destroyAllWindows()
 # ----------------------------
 # SAVE TO DB
 # ----------------------------
-conn = sqlite3.connect("attendance.db")
+conn = psycopg2.connect(
+    host="localhost",
+    database="attendance_system",
+    user="postgres",
+    password="admin123",
+    port="5432"
+)
+
 cursor = conn.cursor()
 
 cursor.execute("""
-INSERT OR REPLACE INTO users (name, expression)
-VALUES (?, ?)
-""", (name, stable_expression))
+UPDATE employees 
+SET expression=%s
+WHERE employee_name=%s
+""", (stable_expression, name))
 
 conn.commit()
 conn.close()
